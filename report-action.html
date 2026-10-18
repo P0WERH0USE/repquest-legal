@@ -1,0 +1,41 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex"><title>Repquest report action</title>
+<style>
+:root{color-scheme:dark}
+body{margin:0;background:#12110E;color:#F4EFE6;font-family:Inter,Arial,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box}
+.card{width:100%;max-width:420px;background:#1a1814;border:1px solid #2A2622;border-radius:16px;padding:28px;text-align:center}
+.brand{color:#F2A23A;font-weight:800;letter-spacing:3px;font-size:13px}
+h1{font-size:22px;margin:16px 0 8px}p{color:#8C8C88;line-height:1.5;margin:6px 0}
+img{width:84px;height:84px;border-radius:12px;object-fit:cover;border:1px solid #2A2622;margin-top:14px}
+.row{display:flex;gap:10px;margin-top:22px}
+button{flex:1;border:0;border-radius:10px;padding:14px;font-size:15px;font-weight:800;cursor:pointer}
+.go{background:#F2A23A;color:#12110E}.go.danger{background:#E8613A;color:#fff}.no{background:transparent;color:#F4EFE6;border:1px solid #2A2622}
+button:disabled{opacity:.5}
+</style></head><body><div class="card"><div class="brand">REPQUEST</div><div id="v"><p>Loading…</p></div></div>
+<script>
+const v=document.getElementById('v');
+const h=new URLSearchParams(location.hash.slice(1));
+const fn=h.get('f'),token=h.get('t');
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function call(confirm){
+  const r=await fetch(fn,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,confirm})});
+  return r.json().catch(()=>({ok:false,message:'Something went wrong.'}));
+}
+function fail(m){v.innerHTML='<h1>Nothing happened</h1><p>'+esc(m)+'</p>';}
+(async()=>{
+  let u;try{u=new URL(fn)}catch(e){return fail('This link is not valid.')}
+  if(!token||u.protocol!=='https:'||!u.hostname.endsWith('.supabase.co'))return fail('This link is not valid.');
+  const d=await call(false);
+  if(!d.ok)return fail(d.message);
+  const i=d.info;
+  if(i.alreadyHandled)return fail('This report has already been handled.');
+  v.innerHTML=(i.avatar?'<img src="'+esc(i.avatar)+'" alt="">':'')+
+    '<h1>'+esc(i.title)+'?</h1><p>Player: <b>'+esc(i.name)+'</b></p>'+
+    '<div class="row"><button class="no" id="n">Cancel</button><button class="go'+(i.action==='suspend'?' danger':'')+'" id="y">Confirm</button></div>';
+  document.getElementById('n').onclick=()=>{v.innerHTML='<h1>Cancelled</h1><p>Nothing was changed. You can close this page.</p>'};
+  document.getElementById('y').onclick=async e=>{
+    e.target.disabled=true;const x=await call(true);
+    v.innerHTML=x.ok?'<h1>Done</h1><p>'+esc(x.message)+'</p>':'<h1>Nothing happened</h1><p>'+esc(x.message)+'</p>';
+  };
+})().catch(()=>fail('Could not reach the server. Try the button in the email again.'));
+</script></body></html>
