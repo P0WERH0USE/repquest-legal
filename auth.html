@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="dark">
+<title>Repquest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:dark;--bg:#12110E;--card:#1a1814;--line:#2A2622;--fg:#F4EFE6;--mut:#9a948a;--amb:#F2A23A;--red:#E8613A}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% 0%,#3a2a14 0%,#12110E 55%);background-color:var(--bg);color:var(--fg);font:16px/1.55 Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;display:flex;align-items:center;justify-content:center;padding:24px 16px}
+.card{width:100%;max-width:420px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:32px 26px;text-align:center}
+.logo{width:150px;height:auto;margin:0 auto 6px;display:block}
+.brand{color:var(--amb);font-weight:800;letter-spacing:4px;font-size:12px;margin:0 0 22px}
+h1{font-family:Lora,Georgia,'Times New Roman',serif;font-size:26px;line-height:1.2;margin:0 0 10px}
+p{color:var(--mut);margin:0 0 16px}
+form{text-align:left;margin-top:22px}
+label{display:block;font-size:12px;font-weight:700;letter-spacing:1.5px;color:var(--mut);text-transform:uppercase;margin:0 0 6px}
+input[type=password],input[type=text]{width:100%;background:#12110E;color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:14px;font-size:16px;margin:0 0 16px;outline:none}
+input:focus{border-color:var(--amb)}
+.show{display:flex;align-items:center;gap:8px;color:var(--mut);font-size:14px;margin:-4px 0 18px}
+.show input{accent-color:var(--amb);width:18px;height:18px;margin:0}
+.btn{display:block;width:100%;border:0;border-radius:10px;padding:15px;font-size:15px;font-weight:800;letter-spacing:1px;text-transform:uppercase;text-align:center;text-decoration:none;cursor:pointer;background:var(--amb);color:#12110E}
+.btn:disabled{opacity:.55;cursor:default}
+.btn.ghost{background:transparent;color:var(--fg);border:1px solid var(--line);margin-top:12px}
+.err{color:var(--red);font-size:14px;margin:-4px 0 14px;min-height:20px}
+.tick{width:56px;height:56px;border-radius:50%;border:2px solid var(--amb);color:var(--amb);display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 16px}
+.tick.bad{border-color:var(--red);color:var(--red)}
+.foot{margin:22px 0 0;font-size:13px;color:#6f6a62}
+</style>
+</head>
+<body>
+<main class="card">
+  <img class="logo" src="logo.png" alt="Repquest">
+  <div id="view"><p>One moment…</p></div>
+  <p class="foot">Repquest · Train. Level up.</p>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+// Fill these two with the public values from your app's .env (EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY).
+// They are public by design. Never put a service-role key here.
+var SUPABASE_URL = 'https://qbaopccyslcsmoxtouus.supabase.co';
+var SUPABASE_ANON_KEY = 'sb_publishable_e9DCfapuQhFUgFhtttEgdA_uKM5D5xQE';
+var MIN_LEN = 8;
+
+var view = document.getElementById('view');
+var q = new URLSearchParams(location.search);
+var tokenHash = q.get('token_hash');
+var type = q.get('type');
+history.replaceState(null, '', location.pathname); // hide the token from the address bar
+
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function msg(kind, title, text, withApp){
+  view.innerHTML = '<div class="tick'+(kind==='bad'?' bad':'')+'">'+(kind==='bad'?'!':'✓')+'</div>'+
+    '<h1>'+esc(title)+'</h1><p>'+esc(text)+'</p>'+
+    (withApp?'<a class="btn" href="repquest://">Open Repquest</a><p class="foot" style="margin-top:14px">If the button does nothing, open the app yourself and sign in.</p>':'');
+}
+function showForm(sb){
+  view.innerHTML = '<h1>Choose a new password</h1><p>Pick something you haven\'t used before. At least '+MIN_LEN+' characters.</p>'+
+    '<form id="f" novalidate>'+
+    '<label for="p1">New password</label><input id="p1" type="password" autocomplete="new-password">'+
+    '<label for="p2">Confirm password</label><input id="p2" type="password" autocomplete="new-password">'+
+    '<div class="show"><input id="sh" type="checkbox"><label for="sh" style="margin:0;text-transform:none;letter-spacing:0;font-weight:400;font-size:14px">Show passwords</label></div>'+
+    '<div class="err" id="e" role="alert"></div>'+
+    '<button class="btn" id="go" type="submit">Save password</button></form>';
+  var p1=document.getElementById('p1'),p2=document.getElementById('p2'),e=document.getElementById('e'),go=document.getElementById('go');
+  document.getElementById('sh').onchange=function(){p1.type=p2.type=this.checked?'text':'password'};
+  document.getElementById('f').onsubmit=async function(ev){
+    ev.preventDefault(); e.textContent='';
+    if(p1.value.length<MIN_LEN){e.textContent='Use at least '+MIN_LEN+' characters.';return}
+    if(p1.value!==p2.value){e.textContent='The two passwords don\'t match.';return}
+    go.disabled=true; go.textContent='Saving…';
+    var r=await sb.auth.updateUser({password:p1.value});
+    if(r.error){
+      var m=(r.error.message||'').toLowerCase();
+      e.textContent = m.indexOf('different')>-1 ? 'Choose a password you haven\'t used before.' :
+                      m.indexOf('weak')>-1||m.indexOf('least')>-1 ? 'That password is too weak. Try a longer one.' :
+                      'Could not save your password. Please request a new link and try again.';
+      go.disabled=false; go.textContent='Save password'; return;
+    }
+    try{await sb.auth.signOut()}catch(x){}
+    msg('ok','Password updated','You can now sign in to Repquest with your new password.',true);
+  };
+}
+async function main(){
+  if(SUPABASE_URL.indexOf('HERE')>-1||SUPABASE_ANON_KEY.indexOf('HERE')>-1){return msg('bad','Not set up yet','This page needs its Supabase settings filled in.')}
+  if(!tokenHash || ['recovery','signup','email','email_change'].indexOf(type)<0){return msg('bad','This link isn\'t valid','Please use the button in your email, or request a new link from the app.')}
+  var sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
+  var r=await sb.auth.verifyOtp({token_hash:tokenHash,type:type});
+  if(r.error){return msg('bad','This link has expired','Links work once and only for a short time. Open Repquest and request a new one from the sign-in screen.')}
+  if(type==='recovery'){showForm(sb)}
+  else{try{await sb.auth.signOut()}catch(x){} msg('ok','Email confirmed','Thanks. Your email is confirmed and you can sign in to Repquest.',true)}
+}
+main().catch(function(){msg('bad','Something went wrong','Check your connection and try the link again.')});
+</script>
+</body>
+</html>
