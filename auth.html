@@ -40,7 +40,7 @@ input:focus{border-color:var(--amb)}
   <div id="view"><p>One moment…</p></div>
   <p class="foot">Repquest · Train. Level up.</p>
 </main>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.1"></script>
 <script>
 // Fill these two with the public values from your app's .env (EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY).
 // They are public by design. Never put a service-role key here.
@@ -52,6 +52,10 @@ var view = document.getElementById('view');
 var q = new URLSearchParams(location.search);
 var tokenHash = q.get('token_hash');
 var type = q.get('type');
+var hq = new URLSearchParams(location.hash.slice(1));   // Supabase's standard emails put the session in the #hash
+var accessToken = hq.get('access_token'), refreshToken = hq.get('refresh_token'), hashType = hq.get('type');
+var hashError = hq.get('error_code') || hq.get('error') || q.get('error_code') || q.get('error');
+var seen = 'hash: ' + (Array.from(hq.keys()).join(', ') || 'none') + ' | query: ' + (Array.from(q.keys()).join(', ') || 'none') + (hashError ? ' | error: ' + hashError : '');
 history.replaceState(null, '', location.pathname); // hide the token from the address bar
 
 function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
@@ -89,11 +93,21 @@ function showForm(sb){
 }
 async function main(){
   if(SUPABASE_URL.indexOf('HERE')>-1||SUPABASE_ANON_KEY.indexOf('HERE')>-1){return msg('bad','Not set up yet','This page needs its Supabase settings filled in.')}
-  if(!tokenHash || ['recovery','signup','email','email_change'].indexOf(type)<0){return msg('bad','This link isn\'t valid','Please use the button in your email, or request a new link from the app.')}
+  var expired=function(){return msg('bad','This link has expired','Links work once and only for a short time. Open Repquest and request a new one from the sign-in screen.')};
+  if(hashError){return expired()}
   var sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
-  var r=await sb.auth.verifyOtp({token_hash:tokenHash,type:type});
-  if(r.error){return msg('bad','This link has expired','Links work once and only for a short time. Open Repquest and request a new one from the sign-in screen.')}
-  if(type==='recovery'){showForm(sb)}
+  var kind, r;
+  if(accessToken && refreshToken){            // standard Supabase email link
+    kind = hashType; r = await sb.auth.setSession({access_token:accessToken,refresh_token:refreshToken});
+  } else if(tokenHash && ['recovery','signup','email','email_change'].indexOf(type)>-1){   // branded template link
+    kind = type; r = await sb.auth.verifyOtp({token_hash:tokenHash,type:type});
+  } else {
+    msg('bad','This link isn\'t valid','Please use the button in your email, or request a new link from the app.');
+    view.insertAdjacentHTML('beforeend','<p class="foot" style="font-size:11px;word-break:break-all">Details: '+esc(seen)+'</p>');
+    return;
+  }
+  if(r.error){return expired()}
+  if(kind==='recovery'){showForm(sb)}
   else{try{await sb.auth.signOut()}catch(x){} msg('ok','Email confirmed','Thanks. Your email is confirmed and you can sign in to Repquest.',true)}
 }
 main().catch(function(){msg('bad','Something went wrong','Check your connection and try the link again.')});
